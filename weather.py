@@ -1,5 +1,7 @@
 import datetime as dt
 import requests #type:ignore
+import sys
+import network #type:ignore
 
 class Time(object): 
     ''' Represents a time of day in 24-hr format'''
@@ -46,17 +48,31 @@ def converToCelsiusFahrenheit(temp):
     return celsius, fahrenheit
 
 
+def connectTointernet():
+    '''connects the ESP32 board to the internet to do API calls
+    takes command line arguments to connect to the internet'''
+    station = network.WLAN(network.STA_IF)
+    station.active(True)
+    station.connect('Ben', 'benmwangi1')
+    return station.isconnected()
 
+if len(sys.argv) == 3 and sys.argv[1] == "-c":
+    City = sys.argv[2]
+    response = getWeather(City)
+else:
+    print('Usage: weather.py -c <City>')
 
+connected = False
+while not connected:
+    connected = connectTointernet()
 
-City = 'Middletown'
-response = getWeather(City)
 tempKevin = response['main']['temp']
 tempCelsius, tempFahrenheit = converToCelsiusFahrenheit(tempKevin)
 feelsLikeKevin = response['main']['feels_like']
 feelsLikeCelsius, feelsLikeFahrenheit = converToCelsiusFahrenheit(feelsLikeKevin)
 humidity = response['main']['humidity']
 description = response['weather'][0]['description']
+
 timeLastUpdated = Time(response['dt'], response['timezone'])
 sunriseTime = Time(response['sys']['sunrise'] , response['timezone']) 
 sunsetTime = Time(response['sys']['sunset'] , response['timezone'])
