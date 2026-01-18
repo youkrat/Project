@@ -28,7 +28,7 @@ sunset  = Time(data["sys"]["sunset"], data["timezone"])
 # ------------------------
 # Screen Definitions
 # ------------------------
-screens = [
+screens = [ 
     (CITY, f"{temp_c}C Hum:{humidity}%"),
     ("Weather:", description),
     ("Sunrise", str(sunrise)),

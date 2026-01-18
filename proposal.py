@@ -32,3 +32,6 @@ SImple trend detection(Increasing or decreasing over time)
 and simulate how temperature proceeds from day to night in preparation for extraction
 of actual data 
 '''
+
+import paho.mqtt.client as mqtt
+print("MQTT OK")

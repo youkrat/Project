@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "node-red-node-serialport": "^2.0.3"
+  }
+}
