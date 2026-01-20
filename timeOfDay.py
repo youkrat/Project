@@ -5,7 +5,7 @@ Reads local sensor data (AHT30 + LDR), fetches remote weather data from
 OpenWeatherMap, infers time-of-day from light trends, and outputs a
 JSON payload suitable for Node-RED visualization.
 """
-from dotenv import load_dotenv
+from dotenv import load_dotenv #type: ignore
 from machine import Pin, I2C, ADC #type:ignore
 from time import sleep, time
 import json

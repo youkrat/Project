@@ -1,0 +1,16 @@
+import os
+
+API_KEY = os.getenv("API_KEY")
+CITY = "Nairobi"
+
+SSID = os.getenv("SSID")
+PASSWORD = os.getenv("PASSWORD")
+
+API_INTERVAL = 60
+
+LUX_HISTORY_SIZE = 60
+DAY_THRESHOLD = 180
+NIGHT_THRESHOLD = 60
+TREND_EPSILON = 5
+
+SD_MOUNT_POINT = "/sd"

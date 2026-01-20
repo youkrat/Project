@@ -1,4 +1,4 @@
-from dotenv import load_getenv #type: ignore
+from dotenv import load_dotenv #type: ignore
 import network #type:ignore
 import urequests #type:ignore
 import time
