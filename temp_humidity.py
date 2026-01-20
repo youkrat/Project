@@ -78,16 +78,9 @@ while True:
 
 '''
 
-#LDR sensor
 from machine import Pin, I2C, ADC
 from time import sleep, time
 import json
-import network
-import urequests
-from umqtt.simple import MQTTClient
-
-
-
 
 class AHT30:
     def __init__(self, i2c, address=0x38):
@@ -109,22 +102,27 @@ class AHT30:
             temperature = (raw_t / 1048576) * 200 - 50
 
             return round(temperature, 2), round(humidity, 2), True
-
         except:
             return None, None, False
 
-def read_light_lux():
-    try:
-        raw = ldr.read()
-        lux = (raw / 4095) * 1000   # rough indoor–outdoor mapping
-        return round(lux, 1), True
-    except:
-        return None, False
 
+# I2C setup
+i2c = I2C(0, scl=Pin(22), sda=Pin(21), freq=100000)
+aht30 = AHT30(i2c)
+
+# LDR setup
+ldr = ADC(Pin(32))
+ldr.atten(ADC.ATTN_11DB)
+ldr.width(ADC.WIDTH_12BIT)
+
+def read_light_lux():
+    raw = ldr.read()
+    lux = (raw / 4095) * 1000
+    return round(lux, 1)
 
 def read_sensors():
     temperature, humidity, aht_ok = aht30.read()
-    lux, light_ok = read_light_lux()
+    lux = read_light_lux()
 
     return {
         "timestamp": time(),
@@ -133,44 +131,10 @@ def read_sensors():
         "light_lux": lux,
         "status": {
             "aht30": aht_ok,
-            "light": light_ok
+            "light": True
         }
     }
 
-def sensors_to_json():
-    return json.dumps(read_sensors())
-
-
-def connect_wifi(ssid, password):
-    wlan = network.WLAN(network.STA_IF)
-    wlan.active(True)
-    wlan.connect(ssid, password)
-
-    while not wlan.isconnected():
-        sleep(0.5)
-
-    print("WiFi connected:", wlan.ifconfig())
-    return wlan
-
-
-
-aht30 = AHT30(i2c)
-
-
-i2c = I2C(
-    0,
-    scl=Pin(22),
-    sda=Pin(21),
-    freq=100000
-)
-
-ldr = ADC(Pin(32))
-ldr.atten(ADC.ATTN_11DB)      # 0–3.3V range
-ldr.width(ADC.WIDTH_12BIT)   # 0–4095
-
-
 while True:
-    payload = sensors_to_json()
-    print(payload)
+    print(json.dumps(read_sensors()))
     sleep(2)
-

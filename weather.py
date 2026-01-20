@@ -1,11 +1,12 @@
-
-
+from dotenv import load_getenv #type: ignore
+import network #type:ignore
+import urequests #type:ignore
 import time
-import requests
+import os
 
-API_KEY = "4274c7e18b26e6691b907dddd4d408cc"
-SSID = "Ben"
-PASSWORD = "benmwangi1"
+API_KEY = os.getenv('API_KEY')
+SSID = os.getenv('SSID')
+PASSWORD = os.getenv('PASSWORD')
 
 class Time:
     def __init__(self, timestamp, timezone_offset):
@@ -21,6 +22,8 @@ class Time:
 
     def _pad(self, value):
         return "0" + str(value) if value < 10 else str(value)
+    
+
 
 
 def connect_to_internet():
@@ -40,7 +43,7 @@ def get_weather(city):
         "http://api.openweathermap.org/data/2.5/weather"
         "?appid=" + API_KEY + "&q=" + city
     )
-    response = requests.get(url)
+    response = urequests.get(url)
     data = response.json()
     response.close()
     return data
@@ -51,4 +54,3 @@ def convert_temp(temp_k):
     f = c * 9 / 5 + 32
     return round(c, 1), round(f, 1)
 
-print(get_weather("Nairobi"))
