@@ -47,8 +47,6 @@ from time import sleep, time
 from config import *
 from aht30 import AHT30
 from light import LightSensor
-from wifi import connect
-from weather_api import get_weather
 from day_night import time_of_day_from_trend, stable_time_state
 from time_utils import Time
 from sdcard_fs import mount_sd
@@ -75,7 +73,14 @@ def get_weather_offline():
 
 
 # Setup
-connect(SSID, PASSWORD)
+# --- NO WIFI ---
+# connect(SSID, PASSWORD)
+ENABLE_SD = False   # ← flip to True only if SD is stable
+
+if ENABLE_SD:
+    mount_sd()
+
+
 mount_sd()
 
 i2c = I2C(0, scl=Pin(22), sda=Pin(21))
@@ -88,63 +93,64 @@ ldr = LightSensor(ldr_adc)
 
 lux_history = []
 local_temp_history = []
-api_temp_history = []
-cached_api = None
-last_api_time = 0
+
+cached_api = get_weather_offline()   # <-- offline stub
 
 while True:
     now = time()
 
+    # -------- LOCAL SENSORS --------
     temp, hum = aht.read()
     if temp is None:
         sleep(1)
         continue
 
     lux = ldr.read_lux()
+
+    # --- histories ---
     lux_history.append(lux)
     lux_history[:] = lux_history[-LUX_HISTORY_SIZE:]
+
+    local_temp_history.append(temp)
+    local_temp_history[:] = local_temp_history[-LUX_HISTORY_SIZE:]
+
+    # -------- STATISTICS --------
     lux_avg = mean(lux_history)
     lux_smooth = moving_average(lux_history, window=10)
     lux_median = median(lux_history)
     lux_min, lux_max, lux_range = min_max_range(lux_history)
     lux_std = std_dev(lux_history)
 
-    state = stable_time_state(time_of_day_from_trend(lux_history))
+    # -------- TIME OF DAY --------
+    state = stable_time_state(
+        time_of_day_from_trend(lux_history)
+    )
 
-    if cached_api is None or now - last_api_time >= API_INTERVAL:
-        raw = get_weather(API_KEY, CITY)
-        tc, tf = convert_temp(raw["main"]["temp"])
-        cached_api = {
-            "temperature_c": tc,
-            "temperature_f": tf,
-            "description": raw["weather"][0]["description"],
-            "sunrise": str(Time(raw["sys"]["sunrise"], raw["timezone"])),
-            "sunset": str(Time(raw["sys"]["sunset"], raw["timezone"]))
-        }
-        last_api_time = now
-
+    # -------- PAYLOAD --------
     payload = {
         "timestamp": now,
+        "mode": "offline",   # Hit a wall with WiFi capabilities
         "local": {
             "temperature_c": temp,
             "humidity_percent": hum,
             "light_lux": lux,
             "time_of_day": state
         },
-        "api": cached_api
-    }
-    payload["stats"] = {
-    "lux_mean": lux_avg,
-    "lux_moving_avg": lux_smooth,
-    "lux_median": lux_median,
-    "lux_min": lux_min,
-    "lux_max": lux_max,
-    "lux_range": lux_range,
-    "lux_std": lux_std
+        "api": cached_api,
+        "stats": {
+            "lux_mean": lux_avg,
+            "lux_moving_avg": lux_smooth,
+            "lux_median": lux_median,
+            "lux_min": lux_min,
+            "lux_max": lux_max,
+            "lux_range": lux_range,
+            "lux_std": lux_std
+        }
     }
 
+    print(payload)
+    if ENABLE_SD:
+      log_to_sd(payload)
 
-    send_to_nodered(payload)
-    log_to_sd(payload)
 
     sleep(1.2)
