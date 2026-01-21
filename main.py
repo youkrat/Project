@@ -52,8 +52,27 @@ from weather_api import get_weather
 from day_night import time_of_day_from_trend, stable_time_state
 from time_utils import Time
 from sdcard_fs import mount_sd
-from logger import log
 from conversions import convert_temp
+from nodered import send as send_to_nodered
+from logger import log as log_to_sd
+from statistics import (
+    mean,
+    moving_average,
+    median,
+    min_max_range,
+    std_dev
+)
+
+
+def get_weather_offline():
+    return {
+        "temperature_c": None,
+        "temperature_f": None,
+        "description": "offline",
+        "sunrise": None,
+        "sunset": None
+    }
+
 
 # Setup
 connect(SSID, PASSWORD)
@@ -68,6 +87,8 @@ ldr_adc.width(ADC.WIDTH_12BIT)
 ldr = LightSensor(ldr_adc)
 
 lux_history = []
+local_temp_history = []
+api_temp_history = []
 cached_api = None
 last_api_time = 0
 
@@ -82,6 +103,11 @@ while True:
     lux = ldr.read_lux()
     lux_history.append(lux)
     lux_history[:] = lux_history[-LUX_HISTORY_SIZE:]
+    lux_avg = mean(lux_history)
+    lux_smooth = moving_average(lux_history, window=10)
+    lux_median = median(lux_history)
+    lux_min, lux_max, lux_range = min_max_range(lux_history)
+    lux_std = std_dev(lux_history)
 
     state = stable_time_state(time_of_day_from_trend(lux_history))
 
@@ -107,8 +133,18 @@ while True:
         },
         "api": cached_api
     }
+    payload["stats"] = {
+    "lux_mean": lux_avg,
+    "lux_moving_avg": lux_smooth,
+    "lux_median": lux_median,
+    "lux_min": lux_min,
+    "lux_max": lux_max,
+    "lux_range": lux_range,
+    "lux_std": lux_std
+    }
 
-    print(payload)
-    log(payload)
+
+    send_to_nodered(payload)
+    log_to_sd(payload)
 
     sleep(1.2)
