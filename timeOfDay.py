@@ -5,21 +5,29 @@ Reads local sensor data (AHT30 + LDR), fetches remote weather data from
 OpenWeatherMap, infers time-of-day from light trends, and outputs a
 JSON payload suitable for Node-RED visualization.
 """
-from dotenv import load_dotenv #type: ignore
-from machine import Pin, I2C, ADC #type:ignore
+
+
+'''
+Workflow mental model:
+Sensors ─┐
+         ├──► payload ───► print → Node-RED(display over the web)
+API ─────┘              └──► append → SD (/sd/*.jsonl)
+
+'''
+from machine import Pin, I2C, ADC, SPI #type:ignore
 from time import sleep, time
 import json
 import network #type: ignore
 import urequests
 import os
+import sdcard #type:ignore
 
-load_dotenv()
 
 # Configuration
-API_KEY = os.getenv('API_KEY')
+API_KEY = ''
 CITY = "Nairobi"
-SSID = os.getenv('SSID')
-PASSWORD = os.getenv('PASSWORD')
+SSID = "Ben"
+PASSWORD = "benmwangi1"
 
 if API_KEY is None:
     raise RuntimeError('WEATHER_API_KEY not set')
@@ -82,18 +90,30 @@ class AHT30:
             return None, None
 
 
-def connect_to_internet() -> bool:
+def connect_to_internet(timeout=15) -> bool:
     """Connect to WiFi and block until connected."""
-    wlan = network.WLAN(network.STA_IF)
-    wlan.active(True)
-    wlan.connect(SSID, PASSWORD)
 
-    while not wlan.isconnected():
+    wlan = network.WLAN(network.STA_IF)
+
+    # Reset interface cleanly
+    if wlan.active():
+        wlan.disconnect()
+        wlan.active(False)
         sleep(1)
 
-    print("WiFi connected:", wlan.ifconfig())
-    sleep(3)
-    return True
+    wlan.active(True)
+    sleep(1)
+
+    wlan.connect(SSID, PASSWORD)
+
+    start = time()
+    while not wlan.isconnected():
+        print("WiFi status:", wlan.status())
+        if time() - start > timeout:
+            print("WiFi connection timed out")
+            return False
+        sleep(0.5)
+
 
 
 def get_weather(city: str) -> dict:
@@ -147,6 +167,55 @@ def stable_time_state(new_state: str) -> str:
         last_time_state = new_state
     return last_time_state
 
+def mount_sd_card() -> bool:
+    global SD_AVAILABLE
+    try:
+        spi = SPI(
+            2,
+            baudrate=10_000_000,
+            polarity=0,
+            phase=0,
+            sck=Pin(18),
+            mosi=Pin(23),
+            miso=Pin(19)
+        )
+        cs = Pin(5, Pin.OUT)
+
+        sd = sdcard.SDCard(spi, cs)
+        os.mount(sd, SD_MOUNT_POINT)
+
+        print("SD card mounted at", SD_MOUNT_POINT)
+        SD_AVAILABLE = True
+        return True
+
+    except Exception as e:
+        print("SD card mount failed:", e)
+        SD_AVAILABLE = False
+        return False
+    
+def get_log_filename() -> str:
+    date = time.strftime("%Y-%m-%d", time.localtime())
+    return f"{SD_MOUNT_POINT}/weather_{date}.jsonl"
+
+
+def log_to_sd(payload: dict):
+    #Error checking if SD card mounting fails
+    if not mount_sd_card():
+        raise RuntimeError("SD card required")
+
+    #Error checking if SD card writing/opening a JSON file fails
+    try:
+        with open(get_log_filename(), "a") as f:
+            f.write(json.dumps(payload) + "\n")
+    except Exception as e:
+        print("SD write error:", e)
+
+
+
+#SD card setup
+
+SD_MOUNT_POINT = "/sd"
+SD_AVAILABLE = False
 
 # Hardware setup
 i2c = I2C(0, scl=Pin(22), sda=Pin(21), freq=100000)
@@ -161,6 +230,7 @@ last_api_time = 0
 lux_history = []
 
 connect_to_internet()
+mount_sd_card()
 
 
 while True:
@@ -218,4 +288,6 @@ while True:
     }
 
     print(json.dumps(payload))
+    log_to_sd(payload)  
+
     sleep(1.2)

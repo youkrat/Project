@@ -1,10 +1,10 @@
 import os
 
-API_KEY = os.getenv("API_KEY")
+API_KEY = ""
 CITY = "Nairobi"
 
-SSID = os.getenv("SSID")
-PASSWORD = os.getenv("PASSWORD")
+SSID = "BenKimani"
+PASSWORD = "benkimani123"
 
 API_INTERVAL = 60
 
